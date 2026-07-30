@@ -43,8 +43,8 @@ NAME_TRAPS.pop('Ковачу', None)
 
 # --- главы «той стороны»: их вставки допустимы также в 9-10 (смешанные) -------
 FAR_SIDE_CHAPTERS = {3, 5, 8}
-HUMAN_CHAPTERS = {1, 2, 4, 6, 7, 11}
-MIXED_CHAPTERS = {9, 10}
+HUMAN_CHAPTERS = {1, 2, 4, 6, 7}
+MIXED_CHAPTERS = {9, 10, 11}
 
 # лексика той стороны, которой не место в чисто человеческих главах
 FAR_WORDS_IN_HUMAN = [
@@ -175,8 +175,11 @@ def check(path):
                     issues.append(('словарь людей', i, f'слово той стороны «{w}»', line[:100]))
 
         # смешанные главы: часы и минуты во «вставках от той стороны».
-        # у них нет часов, отсчёт по солнцу и по вдохам
-        if num in MIXED_CHAPTERS and any(m in low for m in FAR_SIDE_MARKERS):
+        # у них нет часов, отсчёт по солнцу и по вдохам.
+        # маркер ищем и в двух предыдущих абзацах: вставка обычно начинается
+        # с имени, а считают уже в следующей строке
+        context = ' '.join(near_lines(lines, i - 1, back=2)).lower()
+        if num in MIXED_CHAPTERS and any(m in context for m in FAR_SIDE_MARKERS):
             for pat in CLOCK_UNITS:
                 if re.search(pat, low):
                     issues.append(('часы у той стороны', i,
@@ -199,6 +202,19 @@ def check(path):
                 issues.append(('канон', line_no, f'{name}: «{val}», по канону {allowed[0]}', mm.group(0)[:80]))
 
     return issues
+
+
+def near_lines(lines, idx, back=2):
+    """Строка и до `back` предыдущих непустых — контекст абзаца."""
+    out = [lines[idx]]
+    seen = 0
+    j = idx - 1
+    while j >= 0 and seen < back:
+        if lines[j].strip():
+            out.append(lines[j])
+            seen += 1
+        j -= 1
+    return out
 
 
 def check_dialogue(lines):

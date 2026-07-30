@@ -28,7 +28,9 @@ out="pervaya-mezhdumirovaya-glavy-1-$last.md"
     while [ "$n" -le "$last" ]; do
         f="pervaya-mezhdumirovaya-glava-$n.md"
         if [ -f "$f" ]; then
-            tail -n +2 "$f"
+            # заголовок главы сохраняем, но понижаем до второго уровня:
+            # в сводном файле один H1 — название романа
+            sed '1s/^# /## /' "$f"
             echo
         else
             echo "Пропущена глава $n — файла нет." >&2
