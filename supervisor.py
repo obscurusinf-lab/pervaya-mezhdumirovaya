@@ -44,7 +44,7 @@ NAME_TRAPS.pop('Ковачу', None)
 # --- главы «той стороны»: их вставки допустимы также в 9-10 (смешанные) -------
 FAR_SIDE_CHAPTERS = {3, 5, 8}
 HUMAN_CHAPTERS = {1, 2, 4, 6, 7}
-MIXED_CHAPTERS = {9, 10, 11}
+MIXED_CHAPTERS = {9, 10, 11, 12}
 
 # лексика той стороны, которой не место в чисто человеческих главах
 FAR_WORDS_IN_HUMAN = [
@@ -71,9 +71,16 @@ FAR_SIDE_OK = [
 # --- у той стороны нет часов --------------------------------------------------
 # в смешанных главах (9, 10) человеческие и «их» абзацы идут встык,
 # поэтому лексику приходится различать по маркерам в самом абзаце
+# ВАЖНО: только имена и роли. Класть сюда лексику, которую ищут сами
+# проверки («разбор», «поголовье», «створ»), нельзя — человеческая строка
+# с таким словом объявила бы себя строкой той стороны и ушла от проверки.
 FAR_SIDE_MARKERS = [
-    'ханнар', 'оуна', 'тэй', 'илех', 'совиль', 'оценщик',
-    'полог', 'накопител', 'поголовь', 'створ',
+    'ханнар', 'илех', 'совиль', 'оуна', 'тэй', 'аллех', 'ирша', 'тэммет',
+    'оценщик', 'смотритель', 'распорядител',
+]
+HUMAN_MARKERS = [
+    'марта', 'клейн', 'ковач', 'тахира', 'бенали', 'мбайе', 'дюпон',
+    'ленуар', 'абакар', 'ибрагим', 'нгарта', 'корпус', 'абеше', 'ла-гранд',
 ]
 CLOCK_UNITS = [r'\bминут', r'\bсекунд', r'\bчас(ов|а|у|е)?\b']
 
@@ -139,6 +146,7 @@ def check(path):
     num = int(m.group(1)) if m else 0
     far = num in FAR_SIDE_CHAPTERS
     human_only = num in HUMAN_CHAPTERS
+    sides = mark_sides(lines, default='far' if far else 'human')
     issues = []
 
     for i, line in enumerate(lines, 1):
@@ -164,22 +172,20 @@ def check(path):
             if bad in line:
                 issues.append(('имя', i, f'«{bad}» → «{good}»', line[:100]))
 
-        if far:
+        far_context = sides[i - 1] == 'far'
+
+        if far or (num in MIXED_CHAPTERS and far_context):
             for w in MODERN_WORDS:
                 if re.search(w, low) and not any(ok in low for ok in FAR_SIDE_OK):
                     issues.append(('словарь той стороны', i, f'современное слово рядом с «{w.strip()}»', line[:100]))
 
-        if human_only:
+        if human_only or (num in MIXED_CHAPTERS and not far_context):
             for w in FAR_WORDS_IN_HUMAN:
                 if w.lower() in low and not any(ff in low for ff in HUMAN_FALSE_FRIENDS):
                     issues.append(('словарь людей', i, f'слово той стороны «{w}»', line[:100]))
 
-        # смешанные главы: часы и минуты во «вставках от той стороны».
-        # у них нет часов, отсчёт по солнцу и по вдохам.
-        # маркер ищем и в двух предыдущих абзацах: вставка обычно начинается
-        # с имени, а считают уже в следующей строке
-        context = ' '.join(near_lines(lines, i - 1, back=2)).lower()
-        if num in MIXED_CHAPTERS and any(m in context for m in FAR_SIDE_MARKERS):
+        # смешанные главы: часы и минуты во «вставках от той стороны»
+        if num in MIXED_CHAPTERS and far_context:
             for pat in CLOCK_UNITS:
                 if re.search(pat, low):
                     issues.append(('часы у той стороны', i,
@@ -204,17 +210,24 @@ def check(path):
     return issues
 
 
-def near_lines(lines, idx, back=2):
-    """Строка и до `back` предыдущих непустых — контекст абзаца."""
-    out = [lines[idx]]
-    seen = 0
-    j = idx - 1
-    while j >= 0 and seen < back:
-        if lines[j].strip():
-            out.append(lines[j])
-            seen += 1
-        j -= 1
-    return out
+def mark_sides(lines, default='human'):
+    """Кому принадлежит каждая строка — людям или той стороне.
+
+    Стороны в смешанных главах идут длинными блоками, поэтому сторона
+    «липкая»: один раз опознали по имени или по лексике и держим до
+    следующего опознанного маркера. Окно в пару абзацев тут не годится —
+    внутри блока попадаются абзацы без единого имени.
+    """
+    sides = []
+    cur = default
+    for line in lines:
+        low = line.lower()
+        if any(m in low for m in FAR_SIDE_MARKERS):
+            cur = 'far'
+        elif any(m in low for m in HUMAN_MARKERS):
+            cur = 'human'
+        sides.append(cur)
+    return sides
 
 
 def check_dialogue(lines):
