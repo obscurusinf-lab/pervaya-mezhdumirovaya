@@ -170,6 +170,8 @@ def check(path):
         if len(ger) >= 3:
             issues.append(('стиль', i, 'подряд три и более деепричастных оборота', line[:100]))
 
+    issues.extend(check_dialogue(lines))
+
     for name, (pat, allowed) in CANON_FACTS.items():
         for mm in re.finditer(pat, txt, flags=re.IGNORECASE):
             val = mm.group(1).lower()
@@ -178,6 +180,96 @@ def check(path):
                 issues.append(('канон', line_no, f'{name}: «{val}», по канону {allowed[0]}', mm.group(0)[:80]))
 
     return issues
+
+
+def check_dialogue(lines):
+    """Замечание заказчика после гл. 11: диалоги тяжело читаются.
+
+    Ловится механическая часть: однообразная архитектура реплик, отсутствие
+    атрибуции при трёх и более говорящих, реплики-простыни и списки внутри
+    реплики. Остальное — вслух, глазами.
+    """
+    issues = []
+
+    # реплики подряд, с исходными номерами строк
+    replies = [(i, l) for i, l in enumerate(lines, 1) if l.startswith('— ')]
+    if not replies:
+        return issues
+
+    # разбить на серии: соседние реплики, между которыми нет прозы
+    runs, run = [], []
+    prev_idx = None
+    for i, l in replies:
+        between = lines[prev_idx:i - 1] if prev_idx is not None else []
+        broken = any(s.strip() and not s.startswith('— ') for s in between)
+        if prev_idx is not None and not broken:
+            run.append((i, l))
+        else:
+            if len(run) > 1:
+                runs.append(run)
+            run = [(i, l)]
+        prev_idx = i
+    if len(run) > 1:
+        runs.append(run)
+
+    for run in runs:
+        # длинная серия подряд, и ни одна реплика не подписана.
+        # порог 5: чистая перекличка двоих читается и без подписей,
+        # проблема начинается там, где говорящих больше и счёт сбивается
+        unattributed = [(i, l) for i, l in run if not is_attributed(l)]
+        if len(run) >= 5 and len(unattributed) == len(run):
+            i, l = run[0]
+            issues.append(('диалог', i,
+                           f'{len(run)} реплик подряд без атрибуции — подписать хотя бы первую каждого говорящего',
+                           l[:100]))
+
+        # однообразная архитектура: «— реплика. — Действие. — продолжение»
+        # три такие в окне из четырёх подряд идущих реплик
+        flags = [l.count('—') >= 3 for _, l in run]
+        for k in range(len(flags) - 3):
+            if sum(flags[k:k + 4]) >= 3:
+                i, l = run[k]
+                issues.append(('диалог', i,
+                               'три реплики со вставленной ремаркой подряд — развести действие в отдельный абзац',
+                               l[:100]))
+                break
+
+    for i, l in replies:
+        speech = spoken_part(l)
+        if len(speech) > 400:
+            issues.append(('диалог', i, f'реплика-простыня ({len(speech)} знаков речи) — разбить', l[:100]))
+        # именно перечисление, а не «что» как союз: три и более «, что» подряд
+        if len(re.findall(r',\s*что\b', speech)) >= 3:
+            issues.append(('диалог', i,
+                           'список «, что…, что…, что…» внутри реплики — разбить на отдельные предложения',
+                           l[:100]))
+
+    return issues
+
+
+def spoken_part(line):
+    """Из «— Речь. — Ремарка. — Речь.» вернуть только речь.
+
+    Ремарка в русской типографике стоит между тире чётными кусками,
+    поэтому берём куски с чётными индексами.
+    """
+    body = line[2:] if line.startswith('— ') else line
+    chunks = body.split(' — ')
+    return ' '.join(chunks[::2])
+
+
+SPEECH_VERBS = (
+    'сказал', 'спросил', 'ответил', 'произн', 'повторил', 'подтвердил',
+    'согласил', 'добавил', 'заметил', 'отозвал', 'возразил', 'перебил',
+    'уточнил', 'поправил',
+)
+
+
+def is_attributed(line):
+    low = line.lower()
+    if any(v in low for v in SPEECH_VERBS):
+        return True
+    return any(n in line for n in NAMES)
 
 
 def main():
