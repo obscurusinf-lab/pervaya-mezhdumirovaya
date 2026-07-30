@@ -181,20 +181,30 @@ def check(path):
 
 
 def main():
-    files = sys.argv[1:] or sorted(glob.glob('pervaya-mezhdumirovaya-glava-*.md'))
+    args = [a for a in sys.argv[1:] if not a.startswith('-')]
+    flags = {a for a in sys.argv[1:] if a.startswith('-')}
+    brief = bool(flags & {'-b', '--brief'})
+
+    files = args or sorted(glob.glob('pervaya-mezhdumirovaya-glava-*.md'))
     if not files:
         print('Не найдено файлов глав (pervaya-mezhdumirovaya-glava-*.md) и аргументы не переданы.')
         return
+
     total = 0
     for f in files:
         iss = check(f)
         total += len(iss)
+        if brief and not iss:
+            continue
         print(f'\n=== {os.path.basename(f)} — замечаний: {len(iss)}')
         for kind, line, msg, ctx in iss:
             print(f'  [{kind}] стр.{line}: {msg}')
-            print(f'      {ctx}')
+            if not brief:
+                print(f'      {ctx}')
+
     print(f'\nИтого замечаний: {total}')
-    print('Проверено автоматикой. Сюжетные связи, мотивация и знание персонажей — вручную, по КАНОН.md.')
+    if not brief:
+        print('Проверено автоматикой. Сюжетные связи, мотивация и знание персонажей — вручную, по КАНОН.md.')
 
 
 if __name__ == '__main__':
