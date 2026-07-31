@@ -555,7 +555,7 @@
       <div id="searchresults" class="searchresults"></div>
     </div>
     <span class="stamp mono" id="daystamp">день ~174</span>
-    <button class="themetoggle" id="themetoggle" title="Переключить тему">ТЕМА</button>
+    <button class="themetoggle" id="themetoggle"></button>
   </header>
 
   <div class="body-grid">
@@ -901,11 +901,24 @@ searchResults.addEventListener('click', e => {
 
 /* ---------------- theme toggle ---------------- */
 const root = document.documentElement;
-document.getElementById('themetoggle').addEventListener('click', () => {
-  const cur = root.getAttribute('data-theme');
-  const next = cur === 'dark' ? 'light' : (cur === 'light' ? null : (matchMedia('(prefers-color-scheme: dark)').matches ? 'light' : 'dark'));
-  if (next) root.setAttribute('data-theme', next); else root.removeAttribute('data-theme');
+const themeBtn = document.getElementById('themetoggle');
+
+function effectiveTheme() {
+  const forced = root.getAttribute('data-theme');
+  if (forced) return forced;
+  return matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+}
+function updateThemeButton() {
+  const isDark = effectiveTheme() === 'dark';
+  themeBtn.textContent = isDark ? 'Светлая тема' : 'Тёмная тема';
+  themeBtn.setAttribute('aria-label', isDark ? 'Включить светлую тему' : 'Включить тёмную тему');
+}
+themeBtn.addEventListener('click', () => {
+  const next = effectiveTheme() === 'dark' ? 'light' : 'dark';
+  root.setAttribute('data-theme', next);
+  updateThemeButton();
 });
+updateThemeButton();
 
 /* ---------------- init ---------------- */
 renderChapter(currentChapter);
