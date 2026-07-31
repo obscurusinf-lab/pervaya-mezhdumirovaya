@@ -8,7 +8,11 @@ cd "$(dirname "$0")"
 
 last=0
 for f in pervaya-mezhdumirovaya-glava-*.md; do
-    n=$(printf '%s\n' "$f" | sed 's/.*glava-\([0-9]*\)\.md/\1/')
+    n=$(printf '%s\n' "$f" | sed -n 's/.*glava-\([0-9][0-9]*\)\.md$/\1/p')
+    # пропускаем вставные главы вида glava-11-bis.md — у них номер не голое число
+    case "$n" in
+        ''|*[!0-9]*) continue ;;
+    esac
     [ "$n" -gt "$last" ] && last=$n
 done
 
@@ -35,6 +39,12 @@ out="pervaya-mezhdumirovaya-glavy-1-$last.md"
         else
             echo "Пропущена глава $n — файла нет." >&2
         fi
+        # вставные главы вида glava-N-bis.md идут сразу за основной главой N
+        for bis in pervaya-mezhdumirovaya-glava-"$n"-bis*.md; do
+            [ -f "$bis" ] || continue
+            sed '1s/^# /## /' "$bis"
+            echo
+        done
         n=$((n + 1))
     done
 } > "$out.tmp"
