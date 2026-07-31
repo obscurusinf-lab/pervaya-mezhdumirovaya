@@ -1,5 +1,5 @@
 {
   "rewrites": [
-    { "source": "/(.*)", "destination": "/site/bible.html" }
+    { "source": "/((?!api/).*)", "destination": "/site/bible.html" }
   ]
 }

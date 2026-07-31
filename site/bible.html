@@ -203,7 +203,7 @@
     letter-spacing: .03em;
     color: var(--ochre);
   }
-  .editbar-actions { display: flex; gap: .5rem; }
+  .editbar-actions { display: flex; gap: .5rem; flex-wrap: wrap; }
   .editbar-actions button {
     font-size: .7rem;
     padding: .4rem .7rem;
@@ -214,6 +214,19 @@
     color: var(--ochre);
   }
   .editbar-actions button:hover { background: var(--ochre-soft); }
+  .editbar-actions button:disabled { opacity: .5; cursor: default; }
+  #editSubmit { background: var(--ochre); border-color: var(--ochre); color: #100a04; font-weight: 700; }
+  #editSubmit:hover { background: var(--ochre); opacity: .9; }
+  .editbar-status {
+    display: block;
+    width: 100%;
+    font-size: .72rem;
+    line-height: 1.5;
+    margin-top: .1rem;
+  }
+  .editbar-status.ok { color: var(--steel); }
+  .editbar-status.err { color: var(--blood); }
+  .editbar-status a { color: inherit; text-decoration: underline; }
   .doc[contenteditable="true"] {
     outline: 2px dashed var(--ochre);
     outline-offset: 6px;
@@ -625,7 +638,7 @@
   <div class="modal-overlay" id="pwmodal">
     <div class="modal-box">
       <p class="modal-title">Режим правки</p>
-      <p class="modal-hint">Пароль защищает только от случайных нажатий — это не настоящая защита, любой, кто откроет исходный код страницы, его увидит. Изменения нигде не сохраняются, кроме этой вкладки: чтобы не потерять правку, скачайте файл.</p>
+      <p class="modal-hint">На клиенте пароль защищает только от случайных нажатий — исходный код страницы виден всем. На сервере, который принимает правку, пароль проверяется по-настоящему. «Отправить в пул изменений» заводит Pull Request в репозитории — правка не публикуется на сайте сама, пока её не проверят и не примут.</p>
       <input type="password" id="pwinput" class="mono" autocomplete="off" placeholder="Пароль">
       <p class="modal-error" id="pwerror">Неверный пароль</p>
       <div class="modal-actions">
@@ -658,11 +671,13 @@
           <aside class="toc" id="toc"></aside>
           <div class="docwrap">
             <div class="editbar" id="editbar" hidden>
-              <span class="mono">РЕЖИМ ПРАВКИ — текст ниже редактируемый, ничего не сохраняется автоматически</span>
+              <span class="mono">РЕЖИМ ПРАВКИ — текст ниже редактируемый</span>
               <div class="editbar-actions">
+                <button class="mono" id="editSubmit">Отправить в пул изменений</button>
                 <button class="mono" id="editDownload">Скачать .md</button>
                 <button class="mono" id="editExit">Выйти из правки</button>
               </div>
+              <span class="editbar-status mono" id="editStatus"></span>
             </div>
             <div class="docframe">
               <span class="regmark tl" aria-hidden="true">+</span>
@@ -996,10 +1011,20 @@ function openPwModal() {
 }
 function closePwModal() { pwModal.classList.remove('open'); }
 
-function setEditUnlocked(on) {
+// Пароль держим в памяти (не только факт разблокировки), чтобы отправлять
+// его вместе с правкой на сервер — там пароль проверяется по-настоящему,
+// а не только для вида, как в этом клиентском UI.
+let unlockedPassword = sessionStorage.getItem('pmEditPassword') || '';
+
+function setEditUnlocked(on, password) {
   editUnlocked = on;
-  if (on) sessionStorage.setItem('pmEditUnlocked', '1');
-  else sessionStorage.removeItem('pmEditUnlocked');
+  if (on) {
+    sessionStorage.setItem('pmEditUnlocked', '1');
+    unlockedPassword = password || unlockedPassword;
+    sessionStorage.setItem('pmEditPassword', unlockedPassword);
+  } else {
+    sessionStorage.removeItem('pmEditUnlocked');
+  }
   adminBtn.textContent = on ? 'ПРАВКА ВКЛ' : 'ПРАВКА';
   adminBtn.classList.toggle('active', on);
   editBar.hidden = !on;
@@ -1016,7 +1041,7 @@ pwOk.addEventListener('click', tryUnlock);
 pwInput.addEventListener('keydown', e => { if (e.key === 'Enter') tryUnlock(); });
 function tryUnlock() {
   if (pwInput.value === EDIT_PASSWORD) {
-    setEditUnlocked(true);
+    setEditUnlocked(true, pwInput.value);
     closePwModal();
   } else {
     pwError.classList.add('show');
@@ -1054,7 +1079,7 @@ function inlineHtmlToMarkdown(el) {
   return s;
 }
 
-document.getElementById('editDownload').addEventListener('click', () => {
+function buildChapterMarkdown() {
   const c = chaptersById[currentChapter];
   const doc = document.getElementById('doc');
   const paras = Array.from(doc.querySelectorAll(':scope > p'))
@@ -1062,15 +1087,56 @@ document.getElementById('editDownload').addEventListener('click', () => {
     .filter(Boolean);
   const title = c.rawTitle ? `# ${c.rawTitle}` : `# ${c.ordinal}. ${c.name}`;
   const text = title + '\n\n' + paras.join('\n\n') + '\n';
+  return { chapter: c, text };
+}
+
+document.getElementById('editDownload').addEventListener('click', () => {
+  const { chapter, text } = buildChapterMarkdown();
   const blob = new Blob([text], {type: 'text/markdown;charset=utf-8'});
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = `pervaya-mezhdumirovaya-glava-${c.id}-pravka.md`;
+  a.download = `pervaya-mezhdumirovaya-glava-${chapter.id}-pravka.md`;
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
+});
+
+const editStatus = document.getElementById('editStatus');
+const editSubmitBtn = document.getElementById('editSubmit');
+
+function setEditStatus(text, kind) {
+  editStatus.textContent = text;
+  editStatus.className = 'editbar-status mono' + (kind ? ' ' + kind : '');
+}
+
+editSubmitBtn.addEventListener('click', async () => {
+  const { chapter, text } = buildChapterMarkdown();
+  editSubmitBtn.disabled = true;
+  setEditStatus('Отправляю…', '');
+  try {
+    const resp = await fetch('/api/submit-edit', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ password: unlockedPassword, chapterId: chapter.id, content: text }),
+    });
+    const data = await resp.json().catch(() => ({}));
+    if (!resp.ok || !data.ok) {
+      throw new Error(data.error || `Ошибка сервера (${resp.status})`);
+    }
+    setEditStatus('Отправлено: ', 'ok');
+    const link = document.createElement('a');
+    link.href = data.prUrl;
+    link.target = '_blank';
+    link.rel = 'noopener';
+    link.textContent = data.prUrl;
+    editStatus.appendChild(link);
+  } catch (err) {
+    setEditStatus('Не получилось: ' + err.message, 'err');
+  } finally {
+    editSubmitBtn.disabled = false;
+  }
 });
 
 if (editUnlocked) { adminBtn.textContent = 'ПРАВКА ВКЛ'; adminBtn.classList.add('active'); editBar.hidden = false; }
