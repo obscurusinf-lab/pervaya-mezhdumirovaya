@@ -175,12 +175,6 @@
     grid-template-columns: 190px 1fr;
     min-height: 0;
   }
-  @media (max-width: 760px) {
-    .body-grid { grid-template-columns: 1fr; }
-    .spine { flex-direction: row; overflow-x: auto; border-right: none; border-bottom: 2px solid var(--ink); }
-    .spine .tab { border-bottom: none !important; border-right: 1px solid var(--line); }
-  }
-
   .spine {
     border-right: 2px solid var(--ink);
     background: var(--paper-well);
@@ -230,6 +224,26 @@
     line-height: 1.5;
   }
 
+  @media (max-width: 760px) {
+    .body-grid { grid-template-columns: 1fr; }
+    .spine {
+      flex-direction: row;
+      overflow-x: auto;
+      border-right: none;
+      border-bottom: 2px solid var(--ink);
+      padding-top: 0;
+    }
+    .spine .tab {
+      flex: none;
+      border-bottom: none;
+      border-right: 1px solid var(--line);
+      padding: .65rem .75rem;
+      white-space: nowrap;
+    }
+    .spine .tab.active { box-shadow: inset 0 -3px 0 var(--ochre); }
+    .spine .credit { display: none; }
+  }
+
   .stage { min-width: 0; display: flex; flex-direction: column; }
   .view { display: none; flex: 1; min-height: 0; }
   .view.active { display: flex; flex-direction: column; }
@@ -255,6 +269,34 @@
   /* ---------- reader ---------- */
   .reader { flex: 1; display: grid; grid-template-columns: 240px 1fr; min-height: 0; }
   @media (max-width: 900px) { .reader { grid-template-columns: 1fr; } .reader .toc { display: none; } }
+
+  .mobiletoc {
+    display: none;
+    align-items: center;
+    gap: .6rem;
+    padding: .6rem clamp(1rem, 4vw, 3.2rem);
+    background: var(--paper-raised);
+    border-bottom: 1px solid var(--line);
+    position: sticky;
+    top: 0;
+    z-index: 20;
+  }
+  @media (max-width: 900px) { .mobiletoc { display: flex; } }
+  .mobiletoc select {
+    flex: 1;
+    min-width: 0;
+    font-family: ui-monospace, "SF Mono", Consolas, monospace;
+    font-size: .82rem;
+    padding: .55rem .6rem;
+    background: var(--paper);
+    color: var(--ink);
+    border: 1px solid var(--line);
+    border-radius: 2px;
+    -webkit-appearance: none;
+    appearance: none;
+  }
+  .mobiletoc .side-chip { flex: none; }
+
   .toc {
     border-right: 1px solid var(--line);
     overflow-y: auto;
@@ -521,6 +563,10 @@
     <main class="stage">
       <section class="view" id="view-read">
         <div class="reader">
+          <div class="mobiletoc">
+            <span class="side-chip" id="mobiletoc-chip"><span class="dot"></span></span>
+            <select id="mobiletoc-select" aria-label="Выбрать главу"></select>
+          </div>
           <aside class="toc" id="toc"></aside>
           <div class="docwrap">
             <article class="doc" id="doc"></article>
@@ -606,10 +652,22 @@ function renderToc() {
       <span class="tocnum">${c.ordinal}</span>
       <span class="tocname">${c.name || ''}</span>
     </button>`).join('');
+
+  const select = document.getElementById('mobiletoc-select');
+  select.innerHTML = DATA.chapters.map(c =>
+    `<option value="${c.id}" ${c.id === currentChapter ? 'selected' : ''}>${c.ordinal} — ${c.name || ''}</option>`
+  ).join('');
+  const current = chaptersById[currentChapter];
+  const chip = document.getElementById('mobiletoc-chip');
+  chip.className = 'side-chip side-' + sideClass(current.side);
+  chip.innerHTML = '<span class="dot"></span>' + sideLabel(current.side);
 }
 document.getElementById('toc').addEventListener('click', e => {
   const btn = e.target.closest('button[data-id]');
   if (btn) renderChapter(btn.dataset.id);
+});
+document.getElementById('mobiletoc-select').addEventListener('change', e => {
+  renderChapter(e.target.value);
 });
 
 function renderChapter(id) {
