@@ -23,7 +23,8 @@
     --focus: #7fb8ee;
     --shadow: 0 1px 0 rgba(0,0,0,.4), 0 8px 24px -12px rgba(0,0,0,.7);
     --grain-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch' result='t'/%3E%3CfeColorMatrix in='t' type='saturate' values='0'/%3E%3CfeComponentTransfer%3E%3CfeFuncA type='linear' slope='2.2' intercept='-0.55'/%3E%3C/feComponentTransfer%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.16'/%3E%3C/svg%3E");
-    --sat-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='640' height='640'%3E%3Cfilter id='s'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.006' numOctaves='3' seed='11' stitchTiles='stitch' result='t'/%3E%3CfeColorMatrix in='t' type='saturate' values='0'/%3E%3CfeComponentTransfer%3E%3CfeFuncA type='linear' slope='1.1' intercept='-0.4'/%3E%3C/feComponentTransfer%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23s)' opacity='0.16'/%3E%3C/svg%3E");
+    --grain-image-soft: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch' result='t'/%3E%3CfeColorMatrix in='t' type='saturate' values='0'/%3E%3CfeComponentTransfer%3E%3CfeFuncA type='linear' slope='2.2' intercept='-0.55'/%3E%3C/feComponentTransfer%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.06'/%3E%3C/svg%3E");
+    --sat-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='640' height='640'%3E%3Cfilter id='s'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.006' numOctaves='4' seed='11' stitchTiles='stitch' result='t'/%3E%3CfeColorMatrix in='t' type='saturate' values='0'/%3E%3CfeComponentTransfer%3E%3CfeFuncA type='linear' slope='1.6' intercept='-0.35'/%3E%3C/feComponentTransfer%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23s)' opacity='0.4'/%3E%3C/svg%3E");
   }
 
   * { box-sizing: border-box; }
@@ -31,14 +32,26 @@
   body {
     margin: 0;
     background-color: var(--paper);
-    background-image: var(--sat-image), var(--grain-image);
-    background-blend-mode: screen, screen;
-    background-size: 640px 640px, 180px 180px;
-    background-repeat: repeat, repeat;
+    background-image: var(--grain-image);
+    background-blend-mode: screen;
+    background-size: 180px 180px;
+    background-repeat: repeat;
     color: var(--ink);
     font-family: "PT Serif", Georgia, "Noto Serif", "Times New Roman", serif;
     -webkit-font-smoothing: antialiased;
     overflow-x: hidden;
+  }
+  .bg-satellite {
+    position: fixed;
+    inset: -60px;
+    z-index: -1;
+    pointer-events: none;
+    background-color: var(--paper);
+    background-image: var(--sat-image);
+    background-blend-mode: screen;
+    background-size: 640px 640px;
+    background-repeat: repeat;
+    filter: blur(28px);
   }
   .mono {
     font-family: ui-monospace, "SF Mono", "Cascadia Mono", "IBM Plex Mono", Consolas, monospace;
@@ -384,7 +397,7 @@
   @media (max-width: 640px) { .regmark { display: none; } }
   .doc {
     background-color: var(--paper-raised);
-    background-image: var(--grain-image);
+    background-image: var(--grain-image-soft);
     background-blend-mode: screen;
     background-repeat: repeat;
     border: 1px solid var(--line);
@@ -598,6 +611,7 @@
   @media (prefers-reduced-motion: reduce) { * { transition: none !important; scroll-behavior: auto !important; } }
 </style>
 
+<div class="bg-satellite" aria-hidden="true"></div>
 <div class="app">
   <header class="stampbar">
     <div class="brand">
@@ -764,13 +778,17 @@ function renderChapter(id) {
   renderToc();
   const doc = document.getElementById('doc');
   doc.dataset.side = c.side;
-  doc.innerHTML = `
-    <div class="dochead">
-      <div class="docordinal mono">${c.ordinal} <span class="side-chip side-${sideClass(c.side)}" style="margin-left:.6rem"><span class="dot"></span>${sideLabel(c.side)}</span></div>
-      <h2>${c.name}</h2>
-    </div>
-    ${c.html}
-  `;
+  if (editedChapters[id]) {
+    doc.innerHTML = editedChapters[id];
+  } else {
+    doc.innerHTML = `
+      <div class="dochead">
+        <div class="docordinal mono">${c.ordinal} <span class="side-chip side-${sideClass(c.side)}" style="margin-left:.6rem"><span class="dot"></span>${sideLabel(c.side)}</span></div>
+        <h2>${c.name}</h2>
+      </div>
+      ${c.html}
+    `;
+  }
   const idx = DATA.chapters.findIndex(x => x.id === id);
   const prev = DATA.chapters[idx - 1];
   const next = DATA.chapters[idx + 1];
@@ -928,10 +946,27 @@ function renderTimeline() {
 
 /* ---------------- admin edit mode ---------------- */
 // Не настоящая защита: пароль лежит в открытом виде в исходнике страницы.
-// Только чтобы случайный клик не включил правку. Ничего никуда не сохраняется —
-// правка живёт только в этой вкладке, пока её не скачали.
+// Только чтобы случайный клик не включил правку. Ничего никуда не сохраняется
+// на сервер — но пока вкладка открыта (и между обновлениями страницы в
+// пределах вкладки), правки по главам держатся живьём в sessionStorage,
+// так что переключение между главами и разделами их не сбрасывает.
 const EDIT_PASSWORD = '19411941';
 let editUnlocked = sessionStorage.getItem('pmEditUnlocked') === '1';
+
+let editedChapters = {};
+try {
+  const savedEdits = sessionStorage.getItem('pmEditedChapters');
+  if (savedEdits) editedChapters = JSON.parse(savedEdits);
+} catch (e) { editedChapters = {}; }
+
+function saveCurrentEdit() {
+  if (!editUnlocked) return;
+  const doc = document.getElementById('doc');
+  if (!doc) return;
+  editedChapters[currentChapter] = doc.innerHTML;
+  try { sessionStorage.setItem('pmEditedChapters', JSON.stringify(editedChapters)); } catch (e) {}
+}
+document.getElementById('doc').addEventListener('input', saveCurrentEdit);
 
 const adminBtn = document.getElementById('adminbtn');
 const pwModal = document.getElementById('pwmodal');
