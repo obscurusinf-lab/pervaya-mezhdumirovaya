@@ -252,6 +252,51 @@
     outline-offset: 6px;
   }
 
+  .flagbtn[hidden] { display: none; }
+  .flagbtn {
+    position: fixed;
+    z-index: 90;
+    transform: translate(-50%, -100%);
+    font-family: ui-monospace, "SF Mono", Consolas, monospace;
+    font-size: .68rem;
+    letter-spacing: .03em;
+    white-space: nowrap;
+    padding: .5rem .75rem;
+    background: var(--paper-raised);
+    color: var(--ink);
+    border: 1px solid var(--ochre);
+    border-radius: 3px;
+    box-shadow: var(--shadow);
+    cursor: pointer;
+  }
+  .flagbtn:hover { background: var(--ochre-soft); }
+  .flagquote {
+    margin: 0 0 .8rem;
+    padding: .6rem .8rem;
+    border-left: 3px solid var(--ochre);
+    background: var(--paper);
+    font-size: .85rem;
+    font-style: italic;
+    line-height: 1.55;
+    color: var(--ink-faint);
+    max-height: 8.5rem;
+    overflow-y: auto;
+  }
+  .flagcomment {
+    display: block;
+    width: 100%;
+    font-family: inherit;
+    font-size: .88rem;
+    line-height: 1.5;
+    padding: .55rem .7rem;
+    background: var(--paper);
+    border: 1px solid var(--line);
+    border-radius: 2px;
+    color: var(--ink);
+    margin-bottom: .6rem;
+    resize: vertical;
+  }
+
   /* ---------- layout: spine + stage ---------- */
   .body-grid {
     flex: 1;
@@ -672,6 +717,22 @@
     </div>
   </header>
 
+  <button class="flagbtn mono" id="flagBtn" hidden>⚑ Супервайзеру</button>
+
+  <div class="modal-overlay" id="flagModal">
+    <div class="modal-box">
+      <p class="modal-title">Заметка супервайзеру</p>
+      <p class="modal-hint">Цитата уйдёт в очередь на проверку канона — в тексте главы сразу ничего не меняется, кто-то из супервайзеров разберёт её и решит, реальная это нестыковка или нет.</p>
+      <blockquote class="flagquote" id="flagQuote"></blockquote>
+      <textarea class="flagcomment mono" id="flagComment" rows="3" placeholder="Что не так? (необязательно)"></textarea>
+      <div class="modal-actions">
+        <button class="modal-cancel mono" id="flagCancel">Отмена</button>
+        <button class="modal-ok mono" id="flagOk">Отправить</button>
+      </div>
+      <span class="editbar-status mono" id="flagStatus"></span>
+    </div>
+  </div>
+
   <div class="modal-overlay" id="pwmodal">
     <div class="modal-box">
       <p class="modal-title">Режим правки</p>
@@ -793,6 +854,7 @@ function setView(view, opts) {
   if (view === 'chars') renderChars();
   if (view === 'timeline') renderTimeline();
   resetScroll();
+  hideFlagBtn();
 }
 
 document.getElementById('spine').addEventListener('click', e => {
@@ -866,6 +928,7 @@ function renderChapter(id) {
   nextBtn.onclick = () => next && renderChapter(next.id);
   resetScroll();
   applyEditableState();
+  hideFlagBtn();
 }
 
 /* ---------------- reference ---------------- */
@@ -1177,6 +1240,91 @@ editSubmitBtn.addEventListener('click', async () => {
 });
 
 if (editUnlocked) { adminBtn.textContent = 'ПРАВКА ВКЛ'; adminBtn.classList.add('active'); editBar.hidden = false; }
+
+/* ---------------- flag to supervisor ---------------- */
+// Выделил фрагмент главы в читалке — рядом всплывает кнопка «Супервайзеру».
+// Клик открывает подтверждение с цитатой и необязательным комментарием,
+// отправка дописывает пункт в ЗАМЕЧАНИЯ-ЧИТАТЕЛЕЙ.md в репозитории —
+// без пароля, это только очередь на разбор, текст главы не меняется.
+const flagBtn = document.getElementById('flagBtn');
+const flagModal = document.getElementById('flagModal');
+const flagQuote = document.getElementById('flagQuote');
+const flagComment = document.getElementById('flagComment');
+const flagOk = document.getElementById('flagOk');
+const flagCancel = document.getElementById('flagCancel');
+const flagStatus = document.getElementById('flagStatus');
+let pendingFlagText = '';
+let flagSelTimer = null;
+
+function hideFlagBtn() { flagBtn.hidden = true; }
+
+function updateFlagBtn() {
+  if (currentView !== 'read' || flagModal.classList.contains('open')) { return; }
+  const sel = window.getSelection();
+  if (!sel || sel.isCollapsed || sel.rangeCount === 0) { hideFlagBtn(); return; }
+  const text = sel.toString().trim();
+  if (!text) { hideFlagBtn(); return; }
+  const doc = document.getElementById('doc');
+  if (!doc || !doc.contains(sel.anchorNode) || !doc.contains(sel.focusNode)) { hideFlagBtn(); return; }
+  const rect = sel.getRangeAt(0).getBoundingClientRect();
+  if (!rect || (rect.width === 0 && rect.height === 0)) { hideFlagBtn(); return; }
+  pendingFlagText = text.slice(0, 4000);
+  const left = Math.min(Math.max(rect.left + rect.width / 2, 90), window.innerWidth - 90);
+  const top = Math.max(rect.top, 46);
+  flagBtn.style.left = left + 'px';
+  flagBtn.style.top = top + 'px';
+  flagBtn.hidden = false;
+}
+document.addEventListener('selectionchange', () => {
+  clearTimeout(flagSelTimer);
+  flagSelTimer = setTimeout(updateFlagBtn, 150);
+});
+window.addEventListener('scroll', hideFlagBtn, true);
+window.addEventListener('resize', hideFlagBtn);
+
+flagBtn.addEventListener('click', () => {
+  flagQuote.textContent = pendingFlagText;
+  flagComment.value = '';
+  flagStatus.textContent = '';
+  flagStatus.className = 'editbar-status mono';
+  flagModal.classList.add('open');
+  hideFlagBtn();
+});
+flagCancel.addEventListener('click', () => flagModal.classList.remove('open'));
+flagModal.addEventListener('click', e => { if (e.target === flagModal) flagModal.classList.remove('open'); });
+
+flagOk.addEventListener('click', async () => {
+  if (!pendingFlagText) return;
+  const c = chaptersById[currentChapter];
+  flagOk.disabled = true;
+  flagStatus.textContent = 'Отправляю…';
+  flagStatus.className = 'editbar-status mono';
+  try {
+    const resp = await fetch('/api/flag-text', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        chapterId: currentChapter,
+        chapterLabel: `${c.ordinal}${c.name ? ' — ' + c.name : ''}`,
+        quote: pendingFlagText,
+        comment: flagComment.value.trim(),
+      }),
+    });
+    const data = await resp.json().catch(() => ({}));
+    if (!resp.ok || !data.ok) throw new Error(data.error || `Ошибка сервера (${resp.status})`);
+    flagStatus.textContent = 'Отправлено супервайзеру на проверку.';
+    flagStatus.className = 'editbar-status mono ok';
+    setTimeout(() => {
+      flagModal.classList.remove('open');
+      window.getSelection().removeAllRanges();
+    }, 900);
+  } catch (err) {
+    flagStatus.textContent = 'Не получилось: ' + err.message;
+    flagStatus.className = 'editbar-status mono err';
+  } finally {
+    flagOk.disabled = false;
+  }
+});
 
 /* ---------------- init ---------------- */
 renderChapter(currentChapter);
