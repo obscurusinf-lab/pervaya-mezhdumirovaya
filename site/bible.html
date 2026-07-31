@@ -308,21 +308,22 @@
   }
 
   @media (max-width: 760px) {
-    .body-grid { grid-template-columns: 58px 1fr; }
+    .body-grid { grid-template-columns: 1fr; }
     .spine {
-      overflow-y: auto;
-      overflow-x: hidden;
-      padding-top: .4rem;
+      flex-direction: row;
+      overflow-x: auto;
+      border-right: none;
+      border-bottom: 2px solid var(--ink);
+      padding-top: 0;
     }
     .spine .tab {
-      flex-direction: column;
-      gap: .3rem;
-      padding: .6rem .2rem;
-      text-align: center;
+      flex: none;
+      border-bottom: none;
+      border-right: 1px solid var(--line);
+      padding: .65rem .75rem;
+      white-space: nowrap;
     }
-    .spine .tab .tag { margin: 0 auto; }
-    .spine .tab .label { display: none; }
-    .spine .tab.active { box-shadow: inset 3px 0 0 var(--ochre); }
+    .spine .tab.active { box-shadow: inset 0 -3px 0 var(--ochre); }
     .spine .credit { display: none; }
   }
 
