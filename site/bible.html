@@ -301,22 +301,21 @@
   }
 
   @media (max-width: 760px) {
-    .body-grid { grid-template-columns: 1fr; }
+    .body-grid { grid-template-columns: 58px 1fr; }
     .spine {
-      flex-direction: row;
-      overflow-x: auto;
-      border-right: none;
-      border-bottom: 2px solid var(--ink);
-      padding-top: 0;
+      overflow-y: auto;
+      overflow-x: hidden;
+      padding-top: .4rem;
     }
     .spine .tab {
-      flex: none;
-      border-bottom: none;
-      border-right: 1px solid var(--line);
-      padding: .65rem .75rem;
-      white-space: nowrap;
+      flex-direction: column;
+      gap: .3rem;
+      padding: .6rem .2rem;
+      text-align: center;
     }
-    .spine .tab.active { box-shadow: inset 0 -3px 0 var(--ochre); }
+    .spine .tab .tag { margin: 0 auto; }
+    .spine .tab .label { display: none; }
+    .spine .tab.active { box-shadow: inset 3px 0 0 var(--ochre); }
     .spine .credit { display: none; }
   }
 
@@ -679,10 +678,10 @@
 
   <div class="body-grid">
     <nav class="spine" id="spine">
-      <button class="tab" data-view="read"><span class="tag">Ч</span>Читать</button>
-      <button class="tab" data-view="ref"><span class="tag">С</span>Справочник</button>
-      <button class="tab" data-view="chars"><span class="tag">П</span>Персонажи</button>
-      <button class="tab" data-view="timeline"><span class="tag">Т</span>Таймлайн</button>
+      <button class="tab" data-view="read"><span class="tag">Ч</span><span class="label">Читать</span></button>
+      <button class="tab" data-view="ref"><span class="tag">С</span><span class="label">Справочник</span></button>
+      <button class="tab" data-view="chars"><span class="tag">П</span><span class="label">Персонажи</span></button>
+      <button class="tab" data-view="timeline"><span class="tag">Т</span><span class="label">Таймлайн</span></button>
       <div class="credit mono">
         Люди — сталь.<br>
         Ветвь — охра.<br>
