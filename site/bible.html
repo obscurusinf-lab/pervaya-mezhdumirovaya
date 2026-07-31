@@ -22,6 +22,7 @@
     --line: #b3a888;
     --focus: #2b6ba8;
     --shadow: 0 1px 0 rgba(33,29,22,.06), 0 8px 20px -12px rgba(33,29,22,.35);
+    --grain-blend: multiply;
   }
   :root[data-theme="dark"] {
     --paper: #18160f;
@@ -37,6 +38,7 @@
     --line: #3c3728;
     --focus: #7fb8ee;
     --shadow: 0 1px 0 rgba(0,0,0,.3), 0 8px 24px -12px rgba(0,0,0,.6);
+    --grain-blend: overlay;
   }
   @media (prefers-color-scheme: dark) {
     :root:not([data-theme="light"]) {
@@ -53,6 +55,7 @@
       --line: #3c3728;
       --focus: #7fb8ee;
       --shadow: 0 1px 0 rgba(0,0,0,.3), 0 8px 24px -12px rgba(0,0,0,.6);
+      --grain-blend: overlay;
     }
   }
 
@@ -60,7 +63,10 @@
   html, body { height: 100%; }
   body {
     margin: 0;
-    background: var(--paper);
+    background-color: var(--paper);
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch' result='t'/%3E%3CfeColorMatrix in='t' type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.06'/%3E%3C/svg%3E");
+    background-blend-mode: var(--grain-blend, multiply);
+    background-repeat: repeat;
     color: var(--ink);
     font-family: "PT Serif", Georgia, "Noto Serif", "Times New Roman", serif;
     -webkit-font-smoothing: antialiased;
@@ -337,9 +343,47 @@
   .toc button:hover { background: var(--paper); }
 
   .docwrap { overflow-y: auto; overflow-x: hidden; min-width: 0; padding: 1.6rem clamp(1rem, 4vw, 3.2rem) 4rem; }
-  .doc {
+  .manifesto {
+    position: relative;
     max-width: 640px;
-    margin: 0 auto;
+    margin: 0 auto 1.6rem;
+    padding: 1.1rem 1.4rem 1.3rem;
+    border-top: 1px solid var(--line);
+    border-bottom: 1px solid var(--line);
+  }
+  .manifesto-line {
+    margin: 0 0 .4rem;
+    font-family: "PT Serif", Georgia, serif;
+    font-weight: 700;
+    font-size: clamp(1.5rem, 4.5vw, 2.2rem);
+    letter-spacing: -.01em;
+    text-wrap: balance;
+  }
+  .manifesto-sub {
+    margin: 0;
+    font-family: ui-monospace, monospace;
+    font-size: .78rem;
+    letter-spacing: .01em;
+    color: var(--ink-faint);
+    max-width: 58ch;
+  }
+  .docframe { position: relative; max-width: 640px; margin: 0 auto; }
+  .regmark {
+    position: absolute;
+    font-family: ui-monospace, monospace;
+    font-size: .85rem;
+    line-height: 1;
+    color: var(--ink-faint);
+    opacity: .55;
+    pointer-events: none;
+    user-select: none;
+  }
+  .regmark.tl { top: -.6rem; left: -.6rem; }
+  .regmark.tr { top: -.6rem; right: -.6rem; }
+  .regmark.bl { bottom: -.6rem; left: -.6rem; }
+  .regmark.br { bottom: -.6rem; right: -.6rem; }
+  @media (max-width: 640px) { .regmark { display: none; } }
+  .doc {
     background: var(--paper-raised);
     border: 1px solid var(--line);
     box-shadow: var(--shadow);
@@ -580,7 +624,19 @@
           </div>
           <aside class="toc" id="toc"></aside>
           <div class="docwrap">
-            <article class="doc" id="doc"></article>
+            <div class="manifesto">
+              <span class="regmark tl" aria-hidden="true">+</span>
+              <span class="regmark tr" aria-hidden="true">+</span>
+              <p class="manifesto-line">Война без соприкосновения</p>
+              <p class="manifesto-sub">Обе стороны считают друг друга расходом. Обе воюют по неверным данным.</p>
+            </div>
+            <div class="docframe">
+              <span class="regmark tl" aria-hidden="true">+</span>
+              <span class="regmark tr" aria-hidden="true">+</span>
+              <span class="regmark bl" aria-hidden="true">+</span>
+              <span class="regmark br" aria-hidden="true">+</span>
+              <article class="doc" id="doc"></article>
+            </div>
             <div class="docnav">
               <button id="prevch"><span class="lbl">← назад</span><span id="prevlabel"></span></button>
               <button id="nextch" class="next"><span class="lbl">вперёд →</span><span id="nextlabel"></span></button>
