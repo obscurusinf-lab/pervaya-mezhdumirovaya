@@ -378,7 +378,7 @@
   .toc button.current { background: var(--paper); font-weight: 700; }
   .toc button:hover { background: var(--paper); }
 
-  .docwrap { overflow-y: auto; overflow-x: hidden; min-width: 0; padding: 1.6rem clamp(1rem, 4vw, 3.2rem) 4rem; }
+  .docwrap { overflow-y: auto; overflow-x: hidden; overflow-anchor: none; min-width: 0; padding: 1.6rem clamp(1rem, 4vw, 3.2rem) 4rem; }
   .docframe { position: relative; max-width: 640px; margin: 0 auto; }
   .regmark {
     position: absolute;
@@ -465,7 +465,7 @@
   .docnav .lbl { display:block; color: var(--ink-faint); font-size: .68rem; text-transform: uppercase; letter-spacing: .06em; }
 
   /* ---------- generic content scroller for ref/chars/timeline ---------- */
-  .content { flex: 1; overflow-y: auto; padding: 1.6rem clamp(1rem, 4vw, 3rem) 4rem; }
+  .content { flex: 1; overflow-y: auto; overflow-anchor: none; padding: 1.6rem clamp(1rem, 4vw, 3rem) 4rem; }
   .content-inner { max-width: 900px; margin: 0 auto; }
   .content h1.pagehead {
     font-family: "Helvetica Neue", Arial, "Segoe UI", -apple-system, BlinkMacSystemFont, sans-serif;
@@ -716,6 +716,20 @@ function chapterChipsHTML(nums) {
 let currentView = 'read';
 let currentChapter = DATA.chapters[0].id;
 
+// Сброс скролла отложен на два кадра — если делать это синхронно сразу
+// после смены innerHTML, на части мобильных браузеров он не успевает
+// подействовать (страница ещё не доразметилась) или откатывается назад
+// самим браузером (scroll anchoring), и читатель остаётся внизу прошлой главы.
+function resetScroll() {
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      const active = document.querySelector('.view.active .docwrap, .view.active .content');
+      if (active) active.scrollTop = 0;
+      window.scrollTo(0, 0);
+    });
+  });
+}
+
 function setView(view, opts) {
   opts = opts || {};
   currentView = view;
@@ -726,9 +740,7 @@ function setView(view, opts) {
   if (view === 'ref') renderRef();
   if (view === 'chars') renderChars();
   if (view === 'timeline') renderTimeline();
-  window.scrollTo(0,0);
-  const stage = document.querySelector('.stage');
-  if (stage) stage.scrollTop = 0;
+  resetScroll();
 }
 
 document.getElementById('spine').addEventListener('click', e => {
@@ -800,7 +812,7 @@ function renderChapter(id) {
   document.getElementById('nextlabel').textContent = next ? next.name : '';
   prevBtn.onclick = () => prev && renderChapter(prev.id);
   nextBtn.onclick = () => next && renderChapter(next.id);
-  document.querySelector('.docwrap').scrollTop = 0;
+  resetScroll();
   applyEditableState();
 }
 
